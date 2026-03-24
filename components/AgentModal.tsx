@@ -16,13 +16,30 @@ export default function AgentModal({
   const [command, setCommand] = useState('')
   const [sent, setSent] = useState(false)
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!command.trim()) return
-    // TODO (Sage): wire this to agent's actual API endpoint
-    console.log(`Command to ${agent.name}:`, command)
-    setSent(true)
-    setCommand('')
-    setTimeout(() => setSent(false), 3000)
+    
+    try {
+      const response = await fetch(`/api/proxy/agents/${agent.id}/command`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: command,
+        }),
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to send command: ${response.statusText}`)
+      }
+      
+      console.log(`✓ Command sent to ${agent.name}:`, command)
+      setSent(true)
+      setCommand('')
+      setTimeout(() => setSent(false), 3000)
+    } catch (error) {
+      console.error(`✗ Error sending command to ${agent.name}:`, error)
+      alert(`Failed to send command to ${agent.name}. Check console for details.`)
+    }
   }
 
   return (
@@ -116,8 +133,7 @@ export default function AgentModal({
               </p>
             )}
             <p className="text-[10px] text-cream-dim/40 mt-2">
-              {/* TODO (Sage): replace with live agent endpoint */}
-              API endpoint: <span className="font-mono">process.env.{agent.name.toUpperCase()}_API_URL</span>
+              API: <span className="font-mono">/api/proxy/agents/{agent.id}/command</span>
             </p>
           </div>
         </div>

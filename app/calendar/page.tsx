@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { cronJobs } from '@/data/index'
+import { useState, useEffect } from 'react'
 import { agents } from '@/data/agents'
 import { CronJob } from '@/types'
 import { CheckCircle, XCircle, Clock } from 'lucide-react'
@@ -39,7 +38,35 @@ function StatusIcon({ status }: { status: CronJob['lastStatus'] }) {
 }
 
 export default function CalendarPage() {
+  const [cronJobs, setCronJobs] = useState<CronJob[]>([])
+  const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<CronJob | null>(null)
+
+  useEffect(() => {
+    fetchCrons()
+  }, [])
+
+  const fetchCrons = async () => {
+    try {
+      const response = await fetch('/api/proxy/crons')
+      if (response.ok) {
+        const data = await response.json()
+        setCronJobs(data)
+      }
+    } catch (error) {
+      console.error('Error fetching crons:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center h-96">
+        <p className="text-cream-dim">Loading cron jobs...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-8 space-y-8 animate-fade-in">
@@ -149,11 +176,14 @@ export default function CalendarPage() {
                 ))}
               </div>
 
-              {/* TODO (Sage): expose cron config edit fields here */}
+              {/* Cron editing via OpenClaw Control UI (port 54984) */}
               <div className="bg-surface-3 rounded-xl p-3">
-                <p className="text-[10px] tracking-[0.12em] uppercase text-gold mb-1">Config Note</p>
+                <p className="text-[10px] tracking-[0.12em] uppercase text-gold mb-1">Config Source</p>
                 <p className="text-xs text-cream-dim font-mono">
-                  {`# TODO: wire to CRON_CONFIG_${selected.agentId.toUpperCase()}`}
+                  OpenClaw Gateway: http://100.94.225.15:54984
+                </p>
+                <p className="text-[9px] text-cream-dim/60 mt-1">
+                  Cron jobs managed via OpenClaw Control UI (edit there)
                 </p>
               </div>
             </div>

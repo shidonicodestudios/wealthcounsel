@@ -1,5 +1,8 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import { agents } from '@/data/agents'
-import { logEntries, cronJobs } from '@/data/index'
+import { LogEntry, CronJob } from '@/types'
 import AgentCard from '@/components/AgentCard'
 import StatusBadge from '@/components/StatusBadge'
 
@@ -25,11 +28,54 @@ const statusColor: Record<string, string> = {
 }
 
 export default function Dashboard() {
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([])
+  const [cronJobs, setCronJobs] = useState<CronJob[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      const [logsRes, cronsRes] = await Promise.all([
+        fetch('/api/proxy/logs?limit=5'),
+        fetch('/api/proxy/crons'),
+      ])
+
+      if (logsRes.ok) {
+        const logs = await logsRes.json()
+        setLogEntries(logs)
+      }
+
+      if (cronsRes.ok) {
+        const crons = await cronsRes.json()
+        setCronJobs(crons)
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const activeCount = agents.filter((a) => a.status !== 'idle').length
-  const nextCron = cronJobs.sort(
-    (a, b) => new Date(a.nextRun).getTime() - new Date(b.nextRun).getTime()
-  )[0]
+  const nextCron = cronJobs.length > 0 
+    ? cronJobs.sort((a, b) => {
+        const aTime = a.nextRun ? new Date(a.nextRun).getTime() : Infinity
+        const bTime = b.nextRun ? new Date(b.nextRun).getTime() : Infinity
+        return aTime - bTime
+      })[0]
+    : null
   const recentLog = logEntries.slice(0, 5)
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center h-96">
+        <p className="text-cream-dim">Loading dashboard...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-8 space-y-10 animate-fade-in">
@@ -53,7 +99,9 @@ export default function Dashboard() {
           { label: 'Tasks In Progress', value: '2' },
           {
             label: 'Next Cron Job',
-            value: `${nextCron.name} — ${formatTime(nextCron.nextRun)}`,
+            value: nextCron && nextCron.nextRun 
+              ? `${nextCron.name} — ${formatTime(nextCron.nextRun)}`
+              : 'No upcoming jobs',
           },
         ].map(({ label, value }) => (
           <div

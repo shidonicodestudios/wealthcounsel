@@ -1,8 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Task, TaskStatus, TaskPriority } from '@/types'
-import { initialTasks } from '@/data/index'
 import { agents } from '@/data/agents'
 import { Plus, X } from 'lucide-react'
 import clsx from 'clsx'
@@ -69,7 +68,8 @@ function TaskCard({ task, onMove }: { task: Task; onMove: (id: string, status: T
 }
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     title: '',
@@ -78,67 +78,111 @@ export default function TasksPage() {
     notes: '',
   })
 
-  const moveTask = (id: string, status: TaskStatus) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)))
+  // Fetch tasks on mount
+  useEffect(() => {
+    fetchTasks()
+  }, [])
+
+  const fetchTasks = async () => {
+    try {
+      const response = await fetch('/api/proxy/tasks')
+      if (response.ok) {
+        const data = await response.json()
+        setTasks(data)
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const addTask = () => {
-    if (!form.title.trim()) return
-    const newTask: Task = {
-      id: `t${Date.now()}`,
-      ...form,
-      status: 'queued',
-      createdAt: new Date().toISOString(),
+  const moveTask = async (id: string, status: TaskStatus) => {
+    // Optimistic update
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)))
+
+    try {
+      const response = await fetch(`/api/proxy/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+
+      if (!response.ok) {
+        // Revert on error
+        fetchTasks()
+      }
+    } catch (error) {
+      console.error('Error updating task:', error)
+      fetchTasks()
     }
-    setTasks((prev) => [newTask, ...prev])
-    setForm({ title: '', agentId: 'sage', priority: 'medium', notes: '' })
-    setShowForm(false)
+  }
+
+  const addTask = async () => {
+    if (!form.title.trim()) return
+
+    try {
+      const response = await fetch('/api/proxy/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: form.title,
+          agentId: form.agentId,
+          priority: form.priority,
+          notes: form.notes,
+          status: 'queued',
+        }),
+      })
+
+      if (response.ok) {
+        const newTask = await response.json()
+        setTasks((prev) => [newTask, ...prev])
+        setForm({ title: '', agentId: 'sage', priority: 'medium', notes: '' })
+        setShowForm(false)
+      }
+    } catch (error) {
+      console.error('Error creating task:', error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center h-96">
+        <p className="text-cream-dim">Loading tasks...</p>
+      </div>
+    )
   }
 
   return (
     <div className="p-8 space-y-8 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-4xl text-cream tracking-wide">Task Board</h1>
-          <p className="text-sm text-cream-dim mt-1">Track all active and queued work</p>
+          <h1 className="font-serif text-4xl text-cream tracking-wide">Tasks</h1>
+          <p className="text-sm text-cream-dim mt-1">Agent task queue and status board</p>
         </div>
         <button
-          onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-2 px-4 py-2 bg-gold/10 hover:bg-gold/20 border border-gold/30 rounded-xl text-gold text-sm transition-colors"
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 px-4 py-2 bg-gold/10 hover:bg-gold/20 border border-gold/30 rounded-xl text-gold transition-colors"
         >
-          <Plus size={14} />
-          New Task
+          {showForm ? <X size={16} /> : <Plus size={16} />}
+          <span className="text-sm tracking-wide">{showForm ? 'Cancel' : 'New Task'}</span>
         </button>
       </div>
 
-      {/* New task form */}
       {showForm && (
-        <div className="bg-surface-2 border border-surface-3 rounded-2xl p-5 space-y-4 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gold font-medium">New Task</p>
-            <button onClick={() => setShowForm(false)} className="text-cream-dim hover:text-cream">
-              <X size={14} />
-            </button>
-          </div>
+        <div className="bg-surface-2 border border-surface-3 rounded-2xl p-6 space-y-4">
           <input
             type="text"
             placeholder="Task title"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="w-full bg-surface-3 border border-surface-3 focus:border-gold/40 rounded-xl px-4 py-3 text-sm text-cream placeholder-cream-dim/40 outline-none"
+            className="w-full bg-surface-3 border border-surface-3 focus:border-gold/50 rounded-xl px-4 py-3 text-sm text-cream placeholder-cream-dim/40 outline-none transition-colors"
           />
-          <textarea
-            placeholder="Notes (optional)"
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            rows={2}
-            className="w-full bg-surface-3 border border-surface-3 focus:border-gold/40 rounded-xl px-4 py-3 text-sm text-cream placeholder-cream-dim/40 outline-none resize-none"
-          />
-          <div className="flex gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <select
               value={form.agentId}
               onChange={(e) => setForm({ ...form, agentId: e.target.value })}
-              className="flex-1 bg-surface-3 border border-surface-3 rounded-xl px-4 py-3 text-sm text-cream outline-none"
+              className="bg-surface-3 border border-surface-3 focus:border-gold/50 rounded-xl px-4 py-3 text-sm text-cream outline-none transition-colors"
             >
               {agents.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -149,40 +193,50 @@ export default function TasksPage() {
             <select
               value={form.priority}
               onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })}
-              className="flex-1 bg-surface-3 border border-surface-3 rounded-xl px-4 py-3 text-sm text-cream outline-none"
+              className="bg-surface-3 border border-surface-3 focus:border-gold/50 rounded-xl px-4 py-3 text-sm text-cream outline-none transition-colors"
             >
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
+              <option value="low">Low Priority</option>
+              <option value="medium">Medium Priority</option>
+              <option value="high">High Priority</option>
             </select>
           </div>
+          <textarea
+            placeholder="Notes (optional)"
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            rows={3}
+            className="w-full bg-surface-3 border border-surface-3 focus:border-gold/50 rounded-xl px-4 py-3 text-sm text-cream placeholder-cream-dim/40 outline-none transition-colors resize-none"
+          />
           <button
             onClick={addTask}
-            className="px-5 py-2.5 bg-gold/10 hover:bg-gold/20 border border-gold/30 rounded-xl text-gold text-sm transition-colors"
+            className="w-full bg-gold/10 hover:bg-gold/20 border border-gold/30 rounded-xl py-3 text-gold font-medium transition-colors"
           >
-            Add Task
+            Create Task
           </button>
         </div>
       )}
 
-      {/* Kanban columns */}
-      <div className="grid grid-cols-3 gap-5">
-        {columns.map(({ key, label }) => {
-          const colTasks = tasks.filter((t) => t.status === key)
+      <div className="grid grid-cols-3 gap-6">
+        {columns.map((col) => {
+          const colTasks = tasks.filter((t) => t.status === col.key)
           return (
-            <div key={key} className="space-y-3">
-              <div className="flex items-center gap-2 mb-4">
-                <p className="text-[10px] tracking-[0.18em] uppercase text-cream-dim font-semibold">
-                  {label}
+            <div key={col.key} className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] tracking-[0.18em] uppercase text-gold font-semibold">
+                  {col.label}
                 </p>
-                <span className="text-[10px] bg-surface-3 text-cream-dim px-1.5 py-0.5 rounded-full">
-                  {colTasks.length}
-                </span>
+                <span className="text-xs text-cream-dim">{colTasks.length}</span>
               </div>
-              <div className="space-y-3 min-h-24">
-                {colTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} onMove={moveTask} />
-                ))}
+              <div className="space-y-3">
+                {colTasks.length === 0 ? (
+                  <div className="bg-surface-2 border border-surface-3 rounded-xl p-6 text-center">
+                    <p className="text-xs text-cream-dim/40">No tasks</p>
+                  </div>
+                ) : (
+                  colTasks.map((task) => (
+                    <TaskCard key={task.id} task={task} onMove={moveTask} />
+                  ))
+                )}
               </div>
             </div>
           )
