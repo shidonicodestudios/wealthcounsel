@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_BASE_URL = process.env.OPENCLAW_API_URL || 'http://100.94.225.15:8001'
+export const dynamic = 'force-dynamic'
+
+const API_BASE_URL = process.env.OPENCLAW_API_URL || 'http://localhost:8001'
 const API_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN
 
 export async function GET(request: NextRequest) {
