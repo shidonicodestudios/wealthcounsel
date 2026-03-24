@@ -76,9 +76,10 @@ export default function AgentModal({
                 alt={agent.name}
                 width={80}
                 height={80}
-                className="object-cover w-full h-full"
+                className="object-cover w-full h-full rounded-full"
               />
-              <div className="absolute inset-0 flex items-center justify-center bg-brown text-gold font-serif text-2xl font-semibold">
+              {/* Fallback initials */}
+              <div className="absolute inset-0 flex items-center justify-center bg-brown text-gold font-serif text-2xl font-semibold rounded-full">
                 {agent.name[0]}
               </div>
             </div>

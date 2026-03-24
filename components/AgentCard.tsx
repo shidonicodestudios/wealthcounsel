@@ -37,21 +37,17 @@ export default function AgentCard({
 
         {/* Photo + name */}
         <div className="flex items-center gap-3 mb-3">
-          <div className="relative flex-shrink-0">
-            <div className="w-12 h-12 rounded-full overflow-hidden ring-2 ring-gold/50 group-hover:ring-gold transition-all duration-300">
+          <div className="relative flex-shrink-0 w-12 h-12">
+            <div className="w-full h-full rounded-full overflow-hidden ring-2 ring-gold/50 group-hover:ring-gold transition-all duration-300 relative">
               <Image
                 src={agent.photo}
                 alt={agent.name}
                 width={48}
                 height={48}
-                className="object-cover w-full h-full"
-                onError={(e) => {
-                  // Fallback to initials on missing image
-                  e.currentTarget.style.display = 'none'
-                }}
+                className="object-cover w-full h-full rounded-full"
               />
-              {/* Fallback initials */}
-              <div className="absolute inset-0 flex items-center justify-center bg-brown text-gold font-serif text-lg font-semibold">
+              {/* Fallback initials (only shows if image fails to load) */}
+              <div className="absolute inset-0 flex items-center justify-center bg-brown text-gold font-serif text-lg font-semibold rounded-full">
                 {agent.name[0]}
               </div>
             </div>
